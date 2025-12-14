@@ -1,0 +1,11 @@
+{
+  "name": "ds-template",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Hamilton-based data science project template",
+  "scripts": {
+    "server": "bun run scripts/ui/server.ts",
+    "ui": "cd scripts/ui/app && bun run dev",
+    "build-ui": "cd scripts/ui/app && bun run build"
+  }
+}

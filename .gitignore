@@ -1,0 +1,130 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+*.manifest
+*.spec
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Virtual environments
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+.venv/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*.ipynb
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Hamilton UI database (job history)
+.hamilton-ui/
+
+# Vite cache
+.vite/
+
+# Node modules
+node_modules/
+
+# Data files (large data should not be committed)
+*.parquet
+*.h5
+*.hdf5
+*.db
+*.sqlite
+*.sqlite3
+
+# IMPORTANT: Sample data IS committed for template
+# The data/raw/ CSV files are small reference files
+!data/raw/*.csv
+
+# Pipeline results - generated outputs
+results/
+
+# Sandbox - experimental outputs only (code is committed)
+Sandbox/results/
+Sandbox/data/
+Sandbox/*.parquet
+Sandbox/*.csv
+Sandbox/*.db
+Sandbox/*.sqlite
+Sandbox/*.log
+
+# Logs
+*.log
+logs/
+
+# Environment and secrets
+.env
+.env.local
+.env.*.local
+.env.production
+.envrc
+credentials.json
+secrets.json
+*.pem
+*.key
+
+# OS
+.DS_Store
+Thumbs.db
+*.tmp
+
+# Backup files
+*.bak
+*.backup
+*~
+
+# Compressed archives
+*.zip
+*.tar.gz
+*.tar
+*.gz
+*.rar
+
+# pytest
+.pytest_cache/
+.coverage
+htmlcov/
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Ruff
+.ruff_cache/
+
+# Temporary files
+*.tmp
+*.temp
+tmp/
+temp/
