@@ -195,15 +195,15 @@ for name, node in dr.graph.nodes.items():
         continue
 
     # @asset - mark as data catalog entry
-    if re.search(r'@asset(?::\s*([^\n]+))?', doc, re.IGNORECASE):
+    if re.search(r'@asset(?::\\s*([^\\n]+))?', doc, re.IGNORECASE):
         tags.append({'label': 'Asset', 'color': '#f59e0b'})
 
     # @location - hint where data is saved
-    if re.search(r'@location:\s*([^\n]+)', doc, re.IGNORECASE):
+    if re.search(r'@location:\\s*([^\\n]+)', doc, re.IGNORECASE):
         tags.append({'label': 'Location', 'color': '#06b6d4'})
 
     # @viz_output - visualization output (existing, but make explicit)
-    if re.search(r'@viz_output:\s*([^\n]+)', doc, re.IGNORECASE):
+    if re.search(r'@viz_output:\\s*([^\\n]+)', doc, re.IGNORECASE):
         tags.append({'label': 'Viz', 'color': '#ec4899'})
 
     # Keyword-based auto-tags (fallback heuristics)
@@ -729,8 +729,9 @@ async function getCachedDataFramePreview(nodeId: string, limit: number = 10): Pr
   const pythonPath = cwd + "/.venv/bin/python";
 
   // Search for cached parquet files matching the node name
-  // Look in results/, data/, and Sandbox/results/ directories
+  // Look in results/cache/, results/, data/, and Sandbox/results/ directories
   const searchDirs = [
+    `${cwd}/results/cache`,
     `${cwd}/results`,
     `${cwd}/data`,
     `${cwd}/Sandbox/results`,
@@ -967,7 +968,13 @@ async function runPipeline(outputs: string[], nodeId: string): Promise<string> {
   const jobId = `job-${Date.now()}`;
   const pythonPath = process.cwd() + "/.venv/bin/python";
   const config = getConfig();
-  const moduleList = config.modules.map(m => m.split('.').pop()).join(', ');
+  const hasModules = config.modules.length > 0;
+  const moduleImports = hasModules
+    ? config.modules.map(m => `import ${m.replace(/\//g, '.')} as ${m.split('.').pop()}`).join('\n')
+    : '';
+  const moduleList = hasModules
+    ? config.modules.map(m => m.split('.').pop()).join(', ')
+    : '';
 
   // Insert job into database
   insertJob({ id: jobId, node_id: nodeId, status: 'running' });
@@ -988,6 +995,7 @@ async function runPipeline(outputs: string[], nodeId: string): Promise<string> {
     cmd: [pythonPath, "-c", `
 import sys
 import json
+import importlib
 from pathlib import Path
 
 # Ensure output directories exist
@@ -997,10 +1005,23 @@ for d in dirs:
 
 # Build and run Hamilton driver
 from hamilton import driver
-${config.modules.map(m => `import ${m.replace(/\//g, '.')} as ${m.split('.').pop()}`).join('\n')}
+
+${hasModules ? moduleImports : `
+# Auto-discover modules from scripts/*.py
+scripts_dir = Path('scripts')
+modules = []
+for py_file in scripts_dir.glob('*.py'):
+    if py_file.name in ('__init__.py', 'run.py', 'config.py'):
+        continue
+    module_name = f'scripts.{py_file.stem}'
+    try:
+        modules.append(importlib.import_module(module_name))
+    except ImportError as e:
+        print(f'Warning: Could not import {module_name}: {e}', file=sys.stderr)
+`}
 
 print(f"Building Hamilton driver...", flush=True)
-dr = driver.Builder().with_modules(${moduleList}).build()
+${hasModules ? `dr = driver.Builder().with_modules(${moduleList}).build()` : `dr = driver.Builder().with_modules(*modules).build()`}
 
 outputs = [${outputArgs}]
 print(f"Executing pipeline for: {outputs}", flush=True)
@@ -1483,10 +1504,11 @@ const server = Bun.serve({
         await Promise.all(graphData.nodes.map(async (node: any) => {
           const nodeId = node.id;
 
-          // Check for cached data (search in data/ and results/ subdirectories)
+          // Check for cached data (search in results/cache/, data/, and results/ subdirectories)
           let hasCachedData = false;
-          // Check Hamilton pipeline output directories (results/)
+          // Check Hamilton pipeline output directories
           const dataPaths = [
+            `${cwd}/results/cache/${nodeId}.parquet`,
             `${cwd}/results/raw/${nodeId}.parquet`,
             `${cwd}/results/integrated/${nodeId}.parquet`,
             `${cwd}/results/figures/${nodeId}.parquet`,
