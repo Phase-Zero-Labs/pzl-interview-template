@@ -1,11 +1,14 @@
 {
-  "name": "ds-template",
+  "name": "pzl-interview-template",
   "private": true,
   "version": "0.1.0",
-  "description": "Hamilton-based data science project template",
+  "description": "PZL-DSS interview template for data science assessments",
   "scripts": {
-    "server": "bun run scripts/ui/server.ts",
-    "ui": "cd scripts/ui/app && bun run dev",
-    "build-ui": "cd scripts/ui/app && bun run build"
+    "start": "bun run scripts/dss/start.ts",
+    "start:no-open": "bun run scripts/dss/start.ts --no-open",
+    "dev": "bun run scripts/dss/start.ts --dev",
+    "build": "bun run scripts/dss/build.ts",
+    "ui": "cd scripts/dss/app && bun run dev",
+    "build-ui": "cd scripts/dss/app && bun run build"
   }
 }

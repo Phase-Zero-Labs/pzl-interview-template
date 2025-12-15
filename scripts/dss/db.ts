@@ -1,22 +1,38 @@
 /**
- * SQLite database module for Hamilton UI job history.
+ * PZL-DSS SQLite database module for job history.
  *
  * Uses Bun's built-in SQLite support for persistent job tracking
  * and log storage.
+ *
+ * Reliability features:
+ * - Auto-recovery from corruption
+ * - Graceful handling of locked databases
+ * - Automatic backup before recreation
  */
 
 import { Database } from "bun:sqlite";
-import { mkdirSync, existsSync } from "fs";
+import { mkdirSync, existsSync, renameSync } from "fs";
 import { dirname } from "path";
 
 // Database path - relative to project root
-const DB_DIR = ".hamilton-ui";
+const DB_DIR = ".pzl-dss";
 const DB_PATH = `${DB_DIR}/history.db`;
 
 // Maximum jobs to keep (auto-prune oldest)
 const MAX_JOBS = 100;
 
 let db: Database | null = null;
+
+// Logging helper
+function dbLog(level: "info" | "warn" | "error", message: string) {
+  const timestamp = new Date().toISOString().split("T")[1].split(".")[0];
+  const prefix = {
+    info: "\x1b[36m[DB]\x1b[0m",
+    warn: "\x1b[33m[DB WARN]\x1b[0m",
+    error: "\x1b[31m[DB ERROR]\x1b[0m",
+  }[level];
+  console.log(`${timestamp} ${prefix} ${message}`);
+}
 
 // Types
 export interface Job {
@@ -38,20 +54,53 @@ export interface LogLine {
 }
 
 /**
- * Initialize the database, creating tables if needed.
+ * Check database health and determine if it needs recovery.
  */
-export function initDatabase(): Database {
-  if (db) return db;
-
-  // Ensure directory exists
-  if (!existsSync(DB_DIR)) {
-    mkdirSync(DB_DIR, { recursive: true });
+function checkDatabaseHealth(): { healthy: boolean; error?: string } {
+  if (!existsSync(DB_PATH)) {
+    return { healthy: true }; // Will be created fresh
   }
 
-  db = new Database(DB_PATH);
+  try {
+    const testDb = new Database(DB_PATH);
+    // Quick integrity check
+    const result = testDb.query("PRAGMA integrity_check").get() as { integrity_check: string };
+    testDb.close();
 
+    if (result?.integrity_check !== "ok") {
+      return { healthy: false, error: `Integrity check failed: ${result?.integrity_check}` };
+    }
+    return { healthy: true };
+  } catch (e: unknown) {
+    const error = e instanceof Error ? e.message : String(e);
+    if (error.includes("locked") || error.includes("busy")) {
+      return { healthy: false, error: `Database locked: ${error}` };
+    }
+    return { healthy: false, error: `Database error: ${error}` };
+  }
+}
+
+/**
+ * Backup corrupted database before recreation.
+ */
+function backupCorruptedDatabase(): void {
+  if (!existsSync(DB_PATH)) return;
+
+  const backupPath = `${DB_PATH}.corrupt.${Date.now()}`;
+  try {
+    renameSync(DB_PATH, backupPath);
+    dbLog("warn", `Backed up corrupted database to ${backupPath}`);
+  } catch (e) {
+    dbLog("error", `Failed to backup corrupted database: ${e}`);
+  }
+}
+
+/**
+ * Create the database schema.
+ */
+function createSchema(database: Database): void {
   // Create tables
-  db.run(`
+  database.run(`
     CREATE TABLE IF NOT EXISTS jobs (
       id TEXT PRIMARY KEY,
       node_id TEXT NOT NULL,
@@ -63,7 +112,7 @@ export function initDatabase(): Database {
     )
   `);
 
-  db.run(`
+  database.run(`
     CREATE TABLE IF NOT EXISTS logs (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       job_id TEXT NOT NULL,
@@ -75,13 +124,54 @@ export function initDatabase(): Database {
   `);
 
   // Create indexes
-  db.run(`CREATE INDEX IF NOT EXISTS idx_jobs_node ON jobs(node_id)`);
-  db.run(`CREATE INDEX IF NOT EXISTS idx_jobs_start_time ON jobs(start_time DESC)`);
-  db.run(`CREATE INDEX IF NOT EXISTS idx_logs_job ON logs(job_id)`);
+  database.run(`CREATE INDEX IF NOT EXISTS idx_jobs_node ON jobs(node_id)`);
+  database.run(`CREATE INDEX IF NOT EXISTS idx_jobs_start_time ON jobs(start_time DESC)`);
+  database.run(`CREATE INDEX IF NOT EXISTS idx_logs_job ON logs(job_id)`);
+}
 
-  console.log(`[db] Initialized SQLite database at ${DB_PATH}`);
+/**
+ * Initialize the database with resilience.
+ * Auto-recovers from corruption by backing up and recreating.
+ */
+export function initDatabase(): Database {
+  if (db) return db;
 
-  return db;
+  // Ensure directory exists
+  if (!existsSync(DB_DIR)) {
+    mkdirSync(DB_DIR, { recursive: true });
+  }
+
+  // Check database health
+  const health = checkDatabaseHealth();
+
+  if (!health.healthy) {
+    dbLog("warn", `Database unhealthy: ${health.error}`);
+    backupCorruptedDatabase();
+  }
+
+  try {
+    db = new Database(DB_PATH);
+    createSchema(db);
+    dbLog("info", `Initialized database at ${DB_PATH}`);
+    return db;
+  } catch (e: unknown) {
+    const error = e instanceof Error ? e.message : String(e);
+    dbLog("error", `Failed to open database: ${error}`);
+
+    // Last resort: backup and try fresh
+    backupCorruptedDatabase();
+
+    try {
+      db = new Database(DB_PATH);
+      createSchema(db);
+      dbLog("info", `Created fresh database at ${DB_PATH}`);
+      return db;
+    } catch (e2: unknown) {
+      const error2 = e2 instanceof Error ? e2.message : String(e2);
+      dbLog("error", `Failed to create fresh database: ${error2}`);
+      throw new Error(`Cannot initialize database: ${error2}`);
+    }
+  }
 }
 
 /**

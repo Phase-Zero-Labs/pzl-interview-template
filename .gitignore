@@ -45,7 +45,9 @@ venv.bak/
 *~
 .DS_Store
 
-# Hamilton UI database (job history)
+# PZL-DSS local state (job history, sync state, cache index)
+.pzl-dss/
+# Legacy (renamed)
 .hamilton-ui/
 
 # Vite cache

@@ -19,7 +19,7 @@ Start here:
 ```
 scripts/diabetes.py     # Main pipeline module (data loading + analysis)
 scripts/utils/          # Hamilton helpers, visualization
-scripts/ui/             # Web UI for DAG visualization
+scripts/dss/            # PZL-DSS UI for DAG visualization
 interview/              # Instructions and questions
 docs/background/        # Optional reading (git, Hamilton, data assets)
 Sandbox/                # Scratch space for experiments
@@ -59,13 +59,14 @@ rm -rf results/cache/*.parquet
 ## Running the UI
 
 ```bash
-# Terminal 1: Start the API server
-bun run server
+# Single command (auto-opens browser):
+bun start
 
-# Terminal 2: Start the frontend
-cd scripts/ui/app && bun run dev
+# Without auto-open:
+bun start --no-open
 
-# Open http://localhost:5173 (or 5174 if 5173 is busy)
+# Or dev mode:
+bun run dev
 ```
 
 The UI shows:
