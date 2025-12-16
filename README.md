@@ -11,6 +11,19 @@ You'll work with real clinical and biological datasets using Hamilton DAG pipeli
 **Time**: ~1 hour
 **Tools**: This repo + Claude Code (or your preferred AI assistant)
 
+## Prerequisites
+
+- **Python 3.11+**
+- **uv** - Python package manager ([install](https://docs.astral.sh/uv/getting-started/installation/))
+- **Bun** - JavaScript runtime for the UI ([install](https://bun.sh/docs/installation))
+
+```bash
+# Check versions
+python --version   # 3.11+
+uv --version       # any recent version
+bun --version      # any recent version
+```
+
 ## Quick Start
 
 ```bash
