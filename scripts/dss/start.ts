@@ -706,16 +706,15 @@ except Exception as e:
 interface CatalogEntry {
   id: string;
   name: string;
-  type: "parquet" | "csv" | "images" | "mixed";
+  type: "parquet" | "csv" | "xlsx" | "tsv" | "json";
   path: string;
-  fileCount: number;
-  totalSize: string;
+  fileSize: string;
   lastModified: string;
+  category: "source" | "cached" | "output";
   description?: string;
   tags: string[];
   columns?: string[];
   rowCount?: number;
-  sampleImages?: string[];
 }
 
 function formatFileSize(bytes: number): string {
@@ -730,113 +729,80 @@ async function getDataCatalog(): Promise<CatalogEntry[]> {
   const entries: CatalogEntry[] = [];
   const cwd = process.cwd();
 
-  const resultsDir = `${cwd}/results`;
-  try {
-    const proc = spawn({
-      cmd: ["ls", "-1", resultsDir],
+  // Find all data files in the project
+  const findProc = spawn({
+    cmd: [
+      "sh",
+      "-c",
+      `find "${cwd}/data" "${cwd}/results" -type f \\( -name "*.csv" -o -name "*.tsv" -o -name "*.parquet" -o -name "*.xlsx" -o -name "*.json" \\) 2>/dev/null | grep -v __pycache__ | sort`,
+    ],
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+
+  const output = await new Response(findProc.stdout).text();
+  const files = output.trim().split("\n").filter((f) => f);
+
+  for (const filePath of files) {
+    const relativePath = filePath.replace(cwd + "/", "");
+    const fileName = filePath.split("/").pop() || "";
+    const ext = fileName.split(".").pop()?.toLowerCase() || "";
+
+    // Get file stats
+    const statProc = spawn({
+      cmd: ["stat", "-f", "%z %m", filePath],
       stdout: "pipe",
-      stderr: "pipe",
     });
-    const output = await new Response(proc.stdout).text();
-    const subdirs = output
-      .trim()
-      .split("\n")
-      .filter((d) => d && !d.startsWith(".") && d !== "cache");
+    const statOutput = (await new Response(statProc.stdout).text()).trim();
+    const [sizeStr, timestampStr] = statOutput.split(" ");
+    const fileBytes = parseInt(sizeStr) || 0;
+    const timestamp = parseInt(timestampStr) || 0;
+    const lastModified = timestamp ? new Date(timestamp * 1000).toISOString().split("T")[0] : "";
 
-    for (const subdir of subdirs) {
-      const fullPath = `${resultsDir}/${subdir}`;
-
-      const fileCountProc = spawn({
-        cmd: ["sh", "-c", `find "${fullPath}" -type f -name "*.png" 2>/dev/null | wc -l`],
-        stdout: "pipe",
-      });
-      const pngCount = parseInt((await new Response(fileCountProc.stdout).text()).trim()) || 0;
-
-      const svgCountProc = spawn({
-        cmd: ["sh", "-c", `find "${fullPath}" -type f -name "*.svg" 2>/dev/null | wc -l`],
-        stdout: "pipe",
-      });
-      const svgCount = parseInt((await new Response(svgCountProc.stdout).text()).trim()) || 0;
-
-      const parquetCountProc = spawn({
-        cmd: ["sh", "-c", `find "${fullPath}" -type f -name "*.parquet" 2>/dev/null | wc -l`],
-        stdout: "pipe",
-      });
-      const parquetCount = parseInt((await new Response(parquetCountProc.stdout).text()).trim()) || 0;
-
-      const csvCountProc = spawn({
-        cmd: ["sh", "-c", `find "${fullPath}" -type f -name "*.csv" 2>/dev/null | wc -l`],
-        stdout: "pipe",
-      });
-      const csvCount = parseInt((await new Response(csvCountProc.stdout).text()).trim()) || 0;
-
-      const sizeProc = spawn({
-        cmd: ["sh", "-c", `du -sb "${fullPath}" 2>/dev/null | cut -f1`],
-        stdout: "pipe",
-      });
-      const totalBytes = parseInt((await new Response(sizeProc.stdout).text()).trim()) || 0;
-
-      const dateProc = spawn({
-        cmd: [
-          "sh",
-          "-c",
-          `find "${fullPath}" -type f -exec stat -f "%m %N" {} + 2>/dev/null | sort -rn | head -1 | cut -d' ' -f1`,
-        ],
-        stdout: "pipe",
-      });
-      const latestTimestamp = parseInt((await new Response(dateProc.stdout).text()).trim()) || 0;
-      const latestDate = latestTimestamp ? new Date(latestTimestamp * 1000).toISOString().split("T")[0] : "";
-
-      const sampleProc = spawn({
-        cmd: ["sh", "-c", `find "${fullPath}" -type f -name "*.png" 2>/dev/null | head -4`],
-        stdout: "pipe",
-      });
-      const sampleOutput = await new Response(sampleProc.stdout).text();
-      const sampleImages: string[] = [];
-      for (const img of sampleOutput
-        .trim()
-        .split("\n")
-        .filter((f) => f)) {
-        sampleImages.push(img.replace(cwd, ""));
-      }
-
-      let type: CatalogEntry["type"] = "mixed";
-      if (parquetCount > 0 && pngCount === 0 && svgCount === 0) type = "parquet";
-      else if (csvCount > 0 && parquetCount === 0 && pngCount === 0) type = "csv";
-      else if ((pngCount > 0 || svgCount > 0) && parquetCount === 0) type = "images";
-
-      const tags: string[] = [];
-      if (pngCount > 0) tags.push("PNG");
-      if (svgCount > 0) tags.push("SVG");
-      if (parquetCount > 0) tags.push("Parquet");
-      if (csvCount > 0) tags.push("CSV");
-
-      const fileCount = pngCount + svgCount + parquetCount + csvCount;
-      if (fileCount > 0) {
-        entries.push({
-          id: subdir,
-          name: subdir
-            .replace(/_/g, " ")
-            .replace(/\b\w/g, (c) => c.toUpperCase()),
-          type,
-          path: `results/${subdir}`,
-          fileCount,
-          totalSize: formatFileSize(totalBytes),
-          lastModified: latestDate,
-          tags,
-          sampleImages: sampleImages.slice(0, 4),
-        });
-      }
+    // Determine category based on path
+    let category: CatalogEntry["category"] = "output";
+    if (relativePath.startsWith("data/raw")) {
+      category = "source";
+    } else if (relativePath.startsWith("results/cache")) {
+      category = "cached";
     }
-  } catch (e) {
-    log("error", `Error scanning results: ${e}`);
+
+    // Determine type
+    let type: CatalogEntry["type"] = "csv";
+    if (ext === "parquet") type = "parquet";
+    else if (ext === "tsv") type = "tsv";
+    else if (ext === "xlsx") type = "xlsx";
+    else if (ext === "json") type = "json";
+
+    // Generate display name from filename
+    const baseName = fileName.replace(/\.[^.]+$/, "");
+    const displayName = baseName
+      .replace(/_/g, " ")
+      .replace(/\b\w/g, (c) => c.toUpperCase());
+
+    // Tags based on location and type
+    const tags: string[] = [ext.toUpperCase()];
+    if (category === "source") tags.push("Source");
+    else if (category === "cached") tags.push("Cached");
+
+    entries.push({
+      id: relativePath.replace(/[/.]/g, "_"),
+      name: displayName,
+      type,
+      path: relativePath,
+      fileSize: formatFileSize(fileBytes),
+      lastModified,
+      category,
+      tags,
+    });
   }
 
+  // Sort: source files first, then by category, then by name
+  const categoryOrder = { source: 0, cached: 1, output: 2 };
   entries.sort((a, b) => {
-    if (a.lastModified && b.lastModified) {
-      return b.lastModified.localeCompare(a.lastModified);
-    }
-    return b.fileCount - a.fileCount;
+    const catDiff = categoryOrder[a.category] - categoryOrder[b.category];
+    if (catDiff !== 0) return catDiff;
+    return a.name.localeCompare(b.name);
   });
 
   return entries;

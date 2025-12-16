@@ -263,16 +263,35 @@
   color: var(--accent-dark);
 }
 
-/* Grid */
-.catalog-grid {
+/* Sections */
+.catalog-sections {
   flex: 1;
   overflow-y: auto;
-  padding: var(--space-5) var(--space-6);
+  padding: var(--space-4) var(--space-6);
+  background: var(--bg-app);
+}
+
+.catalog-section {
+  margin-bottom: var(--space-6);
+}
+
+.section-title {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  margin-bottom: var(--space-3);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--border);
+}
+
+/* Grid */
+.catalog-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
   gap: var(--space-4);
   align-content: start;
-  background: var(--bg-app);
 }
 
 /* Cards */
