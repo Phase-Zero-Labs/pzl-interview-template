@@ -69,3 +69,25 @@ def raw_diabetic_data() -> pd.DataFrame:
     """
     data_path = Path(__file__).parent.parent / "data" / "raw" / "diabetic_data.csv"
     return pd.read_csv(data_path)
+
+
+# =============================================================================
+# Example Analysis Node
+# =============================================================================
+
+
+@_cached
+def readmission_by_age(raw_diabetic_data: pd.DataFrame) -> pd.DataFrame:
+    """
+    Readmission rates broken down by age group.
+
+    Shows the percentage of patients readmitted within 30 days,
+    after 30 days, or not readmitted, for each age bracket.
+
+    @asset
+    """
+    summary = raw_diabetic_data.groupby('age')['readmitted'].value_counts(normalize=True)
+    summary = summary.unstack(fill_value=0) * 100
+    summary = summary.round(2).reset_index()
+    summary.columns.name = None
+    return summary
