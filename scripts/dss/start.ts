@@ -523,8 +523,6 @@ const runningJobs: Map<string, RunningJob> = new Map();
 async function runPipeline(outputs: string[], nodeId: string): Promise<string> {
   const jobId = `job-${Date.now()}`;
   const pythonPath = process.cwd() + "/.venv/bin/python";
-  const config = getConfig();
-  const moduleList = config.modules.map((m) => m.split(".").pop()).join(", ");
 
   insertJob({ id: jobId, node_id: nodeId, status: "running" });
 
@@ -1051,9 +1049,7 @@ async function getNodeSourceCode(nodeId: string): Promise<{
   lineNumber: number;
   error?: string;
 }> {
-  const config = getConfig();
   const pythonPath = process.cwd() + "/.venv/bin/python";
-  const moduleList = config.modules.map((m) => m.split(".").pop()).join(", ");
 
   const proc = spawn({
     cmd: [
@@ -1062,11 +1058,38 @@ async function getNodeSourceCode(nodeId: string): Promise<{
       `
 import json
 import inspect
+import importlib
+from pathlib import Path
 from hamilton import driver
 
-${config.modules.map((m) => `import ${m.replace(/\//g, ".")} as ${m.split(".").pop()}`).join("\n")}
+# Auto-discover modules from scripts/*.py
+scripts_dir = Path('scripts')
+modules = []
+for py_file in scripts_dir.glob('*.py'):
+    if py_file.name in ('__init__.py', 'run.py', 'config.py'):
+        continue
+    module_name = f'scripts.{py_file.stem}'
+    try:
+        modules.append(importlib.import_module(module_name))
+    except ImportError:
+        pass
 
-modules = [${moduleList}]
+# Auto-discover notebooks
+try:
+    from scripts.utils.notebook_loader import create_synthetic_module
+    for nb_file in scripts_dir.glob('*.ipynb'):
+        if '.ipynb_checkpoints' in str(nb_file):
+            continue
+        module_name = f'scripts.{nb_file.stem}'
+        try:
+            module = create_synthetic_module(nb_file, module_name)
+            if module:
+                modules.append(module)
+        except Exception:
+            pass
+except ImportError:
+    pass
+
 dr = driver.Builder().with_modules(*modules).build()
 
 node_id = "${nodeId}"
