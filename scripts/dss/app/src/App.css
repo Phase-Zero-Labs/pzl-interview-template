@@ -554,6 +554,9 @@ html, body, #root {
   border-radius: var(--radius-md);
   padding: var(--space-3);
   width: 200px;
+  min-height: 70px;
+  max-height: 90px;
+  overflow: hidden;
   transition: all 0.15s ease;
 }
 

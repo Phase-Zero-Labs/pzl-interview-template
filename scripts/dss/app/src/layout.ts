@@ -3,7 +3,7 @@ import type { Node, Edge } from '@xyflow/react';
 import type { HamiltonGraph, PipelineNodeData } from './types';
 
 const NODE_WIDTH = 200;
-const NODE_HEIGHT = 70;
+const NODE_HEIGHT = 90;
 
 export function getLayoutedElements(
   graph: HamiltonGraph
@@ -11,13 +11,13 @@ export function getLayoutedElements(
   const dagreGraph = new dagre.graphlib.Graph();
   dagreGraph.setDefaultEdgeLabel(() => ({}));
 
-  // Configure for left-to-right layout with comfortable spacing
+  // Configure for left-to-right layout with generous spacing
   dagreGraph.setGraph({
     rankdir: 'LR',
-    nodesep: 40,
-    ranksep: 100,
-    marginx: 30,
-    marginy: 30,
+    nodesep: 60,
+    ranksep: 120,
+    marginx: 40,
+    marginy: 40,
   });
 
   // Check which nodes have dependents (are sources for other nodes)
