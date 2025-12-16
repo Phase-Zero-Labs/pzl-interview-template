@@ -71,6 +71,100 @@ def raw_diabetic_data() -> pd.DataFrame:
     return pd.read_csv(data_path)
 
 
+def _parse_ids_mapping() -> dict[str, pd.DataFrame]:
+    """
+    Parse the IDS_mapping.csv file which contains three stacked lookup tables.
+
+    Returns a dict with keys: 'admission_type', 'discharge_disposition', 'admission_source'
+    """
+    data_path = Path(__file__).parent.parent / "data" / "raw" / "IDS_mapping.csv"
+
+    with open(data_path, "r") as f:
+        lines = f.readlines()
+
+    tables = {}
+    current_table = None
+    current_rows = []
+
+    for line in lines:
+        line = line.strip()
+        if not line or line == ",":
+            if current_table and current_rows:
+                tables[current_table] = current_rows
+                current_rows = []
+            continue
+
+        if line.startswith("admission_type_id,"):
+            current_table = "admission_type"
+            continue
+        elif line.startswith("discharge_disposition_id,"):
+            current_table = "discharge_disposition"
+            continue
+        elif line.startswith("admission_source_id,"):
+            current_table = "admission_source"
+            continue
+
+        if current_table:
+            parts = line.split(",", 1)
+            if len(parts) == 2 and parts[0].strip():
+                current_rows.append({
+                    "id": int(parts[0].strip()),
+                    "description": parts[1].strip().strip('"')
+                })
+
+    if current_table and current_rows:
+        tables[current_table] = current_rows
+
+    return {k: pd.DataFrame(v) for k, v in tables.items()}
+
+
+@_cached
+def admission_type_lookup() -> pd.DataFrame:
+    """
+    Lookup table for admission_type_id codes.
+
+    Maps numeric IDs to descriptions:
+    1=Emergency, 2=Urgent, 3=Elective, 4=Newborn, etc.
+
+    Join with raw_diabetic_data on admission_type_id.
+
+    @asset
+    """
+    return _parse_ids_mapping()["admission_type"]
+
+
+@_cached
+def discharge_disposition_lookup() -> pd.DataFrame:
+    """
+    Lookup table for discharge_disposition_id codes.
+
+    Maps numeric IDs to descriptions:
+    1=Discharged to home, 6=Discharged with home health service,
+    7=Left AMA, 11=Expired, 13=Hospice/home, etc.
+
+    Join with raw_diabetic_data on discharge_disposition_id.
+
+    @asset
+    """
+    return _parse_ids_mapping()["discharge_disposition"]
+
+
+@_cached
+def admission_source_lookup() -> pd.DataFrame:
+    """
+    Lookup table for admission_source_id codes.
+
+    Maps numeric IDs to descriptions:
+    1=Physician Referral, 4=Transfer from hospital,
+    7=Emergency Room, etc.
+
+    Join with raw_diabetic_data on admission_source_id.
+
+    @asset
+    """
+    return _parse_ids_mapping()["admission_source"]
+
+
 # =============================================================================
 # Example Analysis Node
 # =============================================================================

@@ -11,15 +11,15 @@ Data:
 """
 
 import pandas as pd
-from pathlib import Path as _Path
-from functools import wraps as _wraps
+from pathlib import Path
+from functools import wraps
 
 
 # =============================================================================
 # Caching utilities (prefixed with _ to hide from Hamilton)
 # =============================================================================
 
-_CACHE_DIR = _Path(__file__).parent.parent / "results" / "cache"
+_CACHE_DIR = Path(__file__).parent.parent / "results" / "cache"
 
 
 def _cached(func):
@@ -29,7 +29,7 @@ def _cached(func):
     Cache is stored in results/cache/{function_name}.parquet
     The cache is automatically invalidated when the pipeline is re-run.
     """
-    @_wraps(func)
+    @wraps(func)
     def wrapper(*args, **kwargs):
         _CACHE_DIR.mkdir(parents=True, exist_ok=True)
         cache_path = _CACHE_DIR / f"{func.__name__}.parquet"
@@ -77,7 +77,7 @@ def sample_metadata() -> pd.DataFrame:
 
     @asset
     """
-    data_path = _Path(__file__).parent.parent / "data" / "raw" / "Samples ID.xlsx"
+    data_path = Path(__file__).parent.parent / "data" / "raw" / "Samples ID.xlsx"
     df = pd.read_excel(data_path, skiprows=2)
 
     # Clean up column names
@@ -125,5 +125,5 @@ def raw_gene_counts() -> pd.DataFrame:
 
     @asset
     """
-    data_path = _Path(__file__).parent.parent / "data" / "raw" / "salmon_gene_counts.tsv"
+    data_path = Path(__file__).parent.parent / "data" / "raw" / "salmon_gene_counts.tsv"
     return pd.read_csv(data_path, sep='\t')

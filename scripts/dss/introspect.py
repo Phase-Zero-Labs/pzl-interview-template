@@ -145,6 +145,10 @@ def introspect_hamilton_graph(title="PZL-DSS Pipeline", project="pzl-dss-templat
                 'color': color if color else '#6b7280'
             })
 
+        # Strip @ tags from doc for display
+        doc_clean = re.sub(r'@(asset|ignore|location|viz_output|no_cache|sync|local|tag)(?::\s*[^\n]+)?', '', doc, flags=re.IGNORECASE)
+        doc_clean = re.sub(r'\n\s*\n', '\n', doc_clean).strip()  # Remove extra blank lines
+
         # Simplify return type
         return_type = str(node.type) if node.type else 'Any'
         if 'DataFrame' in return_type:
@@ -167,7 +171,7 @@ def introspect_hamilton_graph(title="PZL-DSS Pipeline", project="pzl-dss-templat
             'notebook_path': notebook_path,
             'module_info': detected_modules.get(module, {'color': '#666', 'order': 99}),
             'return_type': return_type,
-            'doc': doc[:300] if doc else '',
+            'doc': doc_clean[:300] if doc_clean else '',
             'dependencies': deps,
             'tags': tags,
             'dep_count': len(deps),

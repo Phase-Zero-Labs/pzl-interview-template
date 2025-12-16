@@ -741,7 +741,7 @@ async function getDataCatalog(): Promise<CatalogEntry[]> {
     const subdirs = output
       .trim()
       .split("\n")
-      .filter((d) => d && !d.startsWith("."));
+      .filter((d) => d && !d.startsWith(".") && d !== "cache");
 
     for (const subdir of subdirs) {
       const fullPath = `${resultsDir}/${subdir}`;

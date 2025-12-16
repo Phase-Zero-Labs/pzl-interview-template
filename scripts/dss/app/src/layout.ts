@@ -14,10 +14,10 @@ export function getLayoutedElements(
   // Configure for left-to-right layout with generous spacing
   dagreGraph.setGraph({
     rankdir: 'LR',
-    nodesep: 60,
-    ranksep: 120,
-    marginx: 40,
-    marginy: 40,
+    nodesep: 80,
+    ranksep: 150,
+    marginx: 50,
+    marginy: 50,
   });
 
   // Check which nodes have dependents (are sources for other nodes)
