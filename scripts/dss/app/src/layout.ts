@@ -11,11 +11,11 @@ export function getLayoutedElements(
   const dagreGraph = new dagre.graphlib.Graph();
   dagreGraph.setDefaultEdgeLabel(() => ({}));
 
-  // Configure for left-to-right layout with compact spacing
+  // Configure for left-to-right layout with comfortable spacing
   dagreGraph.setGraph({
     rankdir: 'LR',
-    nodesep: 25,
-    ranksep: 80,
+    nodesep: 40,
+    ranksep: 100,
     marginx: 30,
     marginy: 30,
   });

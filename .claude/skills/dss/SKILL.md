@@ -28,9 +28,9 @@ scripts/
 │   ├── data_source.py  # DataSource protocol
 │   ├── visualization.py # AGC styling
 │   └── notebook_loader.py # Notebook function extraction
-└── ui/                 # Interactive UI
-    ├── server.ts       # Bun API server (port 5050)
-    └── app/            # React Flow UI (port 5173)
+└── dss/                # Interactive UI
+    ├── start.ts        # Bun server (builds + serves, port 5050)
+    └── app/            # React UI source
 
 Sandbox/
 ├── scripts/            # Experimental scripts
@@ -252,16 +252,12 @@ The server auto-detects tags from docstrings:
 
 ### From the UI
 
-1. Start servers:
+1. Start server:
    ```bash
-   # Terminal 1: API server
-   bun run server
-
-   # Terminal 2: React UI
-   cd scripts/ui/app && bun run dev
+   bun start
    ```
 
-2. Open `http://localhost:5173`
+2. Open `http://localhost:5050`
 3. Click any node to select it
 4. Click "Run This Node" in detail panel
 5. Watch live execution output

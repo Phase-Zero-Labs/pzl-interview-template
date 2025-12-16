@@ -387,7 +387,17 @@ async function findVisualizations(
   const cwd = process.cwd();
   const nodeConfig = nodeVizCache.get(nodeId);
 
-  if (nodeConfig?.output_dir) {
+  // Priority 0: Direct PNG file in results/ matching node name (e.g., results/node_name.png)
+  const directVizPath = `${cwd}/results/${nodeId}.png`;
+  const directVizFile = Bun.file(directVizPath);
+  if (await directVizFile.exists()) {
+    images.push(`/results/${nodeId}.png`);
+    totalAvailable = 1;
+    outputDir = "results";
+  }
+
+  // Priority 1: Explicit @viz_output from docstring
+  if (images.length === 0 && nodeConfig?.output_dir) {
     const explicitDir = nodeConfig.output_dir.startsWith("/")
       ? nodeConfig.output_dir
       : `${cwd}/${nodeConfig.output_dir}`;
@@ -540,6 +550,7 @@ async function runPipeline(outputs: string[], nodeId: string): Promise<string> {
 import sys
 import json
 import re
+import importlib
 import pandas as pd
 from pathlib import Path
 
@@ -552,7 +563,38 @@ CACHE_DIR = Path("results/cache")
 ENABLE_CACHE = ${enableCache ? "True" : "False"}
 
 from hamilton import driver
-${config.modules.map((m) => `import ${m.replace(/\//g, ".")} as ${m.split(".").pop()}`).join("\n")}
+
+# Auto-discover modules from scripts/*.py
+scripts_dir = Path('scripts')
+modules = []
+for py_file in scripts_dir.glob('*.py'):
+    if py_file.name in ('__init__.py', 'run.py', 'config.py'):
+        continue
+    module_name = f'scripts.{py_file.stem}'
+    try:
+        modules.append(importlib.import_module(module_name))
+    except ImportError as e:
+        print(f'Warning: Could not import {module_name}: {e}', file=sys.stderr)
+
+# Auto-discover notebooks
+try:
+    from scripts.utils.notebook_loader import create_synthetic_module
+    for nb_file in scripts_dir.glob('*.ipynb'):
+        if '.ipynb_checkpoints' in str(nb_file):
+            continue
+        module_name = f'scripts.{nb_file.stem}'
+        try:
+            module = create_synthetic_module(nb_file, module_name)
+            if module:
+                modules.append(module)
+        except Exception as e:
+            print(f'Warning: Could not load notebook {nb_file.name}: {e}', file=sys.stderr)
+except ImportError:
+    pass
+
+if not modules:
+    print(json.dumps({"status": "error", "message": "No Hamilton modules found in scripts/"}))
+    sys.exit(1)
 
 def should_cache(node) -> bool:
     """Check if node should be cached (no @no_cache tag)."""
@@ -567,7 +609,7 @@ def get_sync_tag(node) -> bool:
     return '@sync' in doc.lower()
 
 print(f"Building Hamilton driver...", flush=True)
-dr = driver.Builder().with_modules(${moduleList}).build()
+dr = driver.Builder().with_modules(*modules).build()
 
 outputs = [${outputArgs}]
 print(f"Executing pipeline for: {outputs}", flush=True)
@@ -1482,6 +1524,8 @@ async function handleApiRequest(
 
           let hasCachedData = false;
           const dataPaths = [
+            `${cwd}/results/cache/${nodeId}.parquet`,
+            `${cwd}/results/${nodeId}.parquet`,
             `${cwd}/results/raw/${nodeId}.parquet`,
             `${cwd}/results/integrated/${nodeId}.parquet`,
             `${cwd}/results/figures/${nodeId}.parquet`,
@@ -1497,20 +1541,32 @@ async function handleApiRequest(
           let hasVisualizations = false;
           let vizCount = 0;
 
-          const vizDir = `${cwd}/Sandbox/results/${nodeId}`;
-          if (await dirExists(vizDir)) {
-            const countProc = spawn({
-              cmd: [
-                "sh",
-                "-c",
-                `find "${vizDir}" -maxdepth 2 -type f \\( -name "*.png" -o -name "*.svg" -o -name "*.jpg" \\) 2>/dev/null | wc -l`,
-              ],
-              stdout: "pipe",
-            });
-            vizCount = parseInt((await new Response(countProc.stdout).text()).trim()) || 0;
-            hasVisualizations = vizCount > 0;
+          // Check for direct PNG file in results/ matching node name (e.g., results/node_name.png)
+          const directVizPath = `${cwd}/results/${nodeId}.png`;
+          const directVizFile = Bun.file(directVizPath);
+          if (await directVizFile.exists()) {
+            hasVisualizations = true;
+            vizCount = 1;
           }
 
+          // Check convention directory (Sandbox/results/{nodeId}/)
+          if (!hasVisualizations) {
+            const vizDir = `${cwd}/Sandbox/results/${nodeId}`;
+            if (await dirExists(vizDir)) {
+              const countProc = spawn({
+                cmd: [
+                  "sh",
+                  "-c",
+                  `find "${vizDir}" -maxdepth 2 -type f \\( -name "*.png" -o -name "*.svg" -o -name "*.jpg" \\) 2>/dev/null | wc -l`,
+                ],
+                stdout: "pipe",
+              });
+              vizCount = parseInt((await new Response(countProc.stdout).text()).trim()) || 0;
+              hasVisualizations = vizCount > 0;
+            }
+          }
+
+          // Check @viz_output from docstring
           if (!hasVisualizations) {
             const nodeConfig = nodeVizCache.get(nodeId);
             if (nodeConfig?.output_dir) {

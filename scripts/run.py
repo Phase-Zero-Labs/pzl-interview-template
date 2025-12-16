@@ -113,10 +113,10 @@ def is_server_running() -> bool:
 
 def start_server_background() -> subprocess.Popen:
     """Start the Bun server in background."""
-    server_path = PROJECT_ROOT / "scripts" / "ui" / "server.ts"
+    server_path = PROJECT_ROOT / "scripts" / "dss" / "start.ts"
 
     proc = subprocess.Popen(
-        ["bun", "run", str(server_path)],
+        ["bun", "run", str(server_path), "--no-open"],
         cwd=str(PROJECT_ROOT),
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
