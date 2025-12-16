@@ -412,46 +412,17 @@ async function findVisualizations(
     }
   }
 
+  // Check results/{nodeId}/ convention
   if (images.length === 0) {
-    const conventionDir = `${cwd}/Sandbox/results/${nodeId}`;
+    const conventionDir = `${cwd}/results/${nodeId}`;
     if (await dirExists(conventionDir)) {
-      outputDir = `Sandbox/results/${nodeId}`;
+      outputDir = `results/${nodeId}`;
       const found = await findImagesInDir(conventionDir);
       totalAvailable = found.length;
       for (const f of found.slice(0, 24)) {
         images.push(f.replace(cwd, ""));
       }
     }
-  }
-
-  if (images.length === 0) {
-    const resultsDir = `${cwd}/Sandbox/results`;
-    try {
-      const proc = spawn({ cmd: ["ls", "-1", resultsDir], stdout: "pipe", stderr: "pipe" });
-      const output = await new Response(proc.stdout).text();
-      const subdirs = output
-        .trim()
-        .split("\n")
-        .filter((d) => d && !d.startsWith("."));
-
-      const nodeIdLower = nodeId.toLowerCase();
-      for (const subdir of subdirs) {
-        const subdirLower = subdir.toLowerCase();
-        if (nodeIdLower.includes(subdirLower) || subdirLower.includes(nodeIdLower.replace(/_/g, ""))) {
-          const matchDir = `${resultsDir}/${subdir}`;
-          if (await dirExists(matchDir)) {
-            outputDir = `Sandbox/results/${subdir}`;
-            const found = await findImagesInDir(matchDir);
-            totalAvailable += found.length;
-            for (const f of found.slice(0, 24 - images.length)) {
-              if (!images.includes(f.replace(cwd, ""))) {
-                images.push(f.replace(cwd, ""));
-              }
-            }
-          }
-        }
-      }
-    } catch {}
   }
 
   const dataDir = `${cwd}/data`;
@@ -553,9 +524,8 @@ import pandas as pd
 from pathlib import Path
 
 # Setup directories
-dirs = ["results/raw", "results/integrated", "results/figures", "results/cache"]
-for d in dirs:
-    Path(d).mkdir(parents=True, exist_ok=True)
+# Ensure cache directory exists
+Path("results/cache").mkdir(parents=True, exist_ok=True)
 
 CACHE_DIR = Path("results/cache")
 ENABLE_CACHE = ${enableCache ? "True" : "False"}
@@ -760,7 +730,7 @@ async function getDataCatalog(): Promise<CatalogEntry[]> {
   const entries: CatalogEntry[] = [];
   const cwd = process.cwd();
 
-  const resultsDir = `${cwd}/Sandbox/results`;
+  const resultsDir = `${cwd}/results`;
   try {
     const proc = spawn({
       cmd: ["ls", "-1", resultsDir],
@@ -849,7 +819,7 @@ async function getDataCatalog(): Promise<CatalogEntry[]> {
             .replace(/_/g, " ")
             .replace(/\b\w/g, (c) => c.toUpperCase()),
           type,
-          path: `Sandbox/results/${subdir}`,
+          path: `results/${subdir}`,
           fileCount,
           totalSize: formatFileSize(totalBytes),
           lastModified: latestDate,
@@ -893,7 +863,7 @@ async function getCachedDataFramePreview(
   const pythonPath = cwd + "/.venv/bin/python";
 
   // Search cache first, then other locations
-  const searchDirs = [`${cwd}/results/cache`, `${cwd}/results`, `${cwd}/data`, `${cwd}/Sandbox/results`];
+  const searchDirs = [`${cwd}/results/cache`, `${cwd}/results`, `${cwd}/data`];
 
   let cachedFile: string | null = null;
 
@@ -1549,9 +1519,6 @@ async function handleApiRequest(
           const dataPaths = [
             `${cwd}/results/cache/${nodeId}.parquet`,
             `${cwd}/results/${nodeId}.parquet`,
-            `${cwd}/results/raw/${nodeId}.parquet`,
-            `${cwd}/results/integrated/${nodeId}.parquet`,
-            `${cwd}/results/figures/${nodeId}.parquet`,
           ];
           for (const dataPath of dataPaths) {
             const dataFile = Bun.file(dataPath);
@@ -1572,9 +1539,9 @@ async function handleApiRequest(
             vizCount = 1;
           }
 
-          // Check convention directory (Sandbox/results/{nodeId}/)
+          // Check convention directory (results/{nodeId}/)
           if (!hasVisualizations) {
-            const vizDir = `${cwd}/Sandbox/results/${nodeId}`;
+            const vizDir = `${cwd}/results/${nodeId}`;
             if (await dirExists(vizDir)) {
               const countProc = spawn({
                 cmd: [
