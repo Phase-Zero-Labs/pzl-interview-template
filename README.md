@@ -26,7 +26,7 @@ bun --version      # any recent version
 
 ## Quick Start
 
-```bash
+```bash§
 # Clone and enter
 git clone https://github.com/Phase-Zero-Labs/pzl-interview-template.git
 cd pzl-interview-template
